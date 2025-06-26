@@ -1,0 +1,36 @@
+# UV ignore file - files to exclude from uv operations
+
+# Data files
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Cache
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Documentation builds
+docs/_build/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Archive
+archieve/
+
+# Logs
+*.log
+logs/

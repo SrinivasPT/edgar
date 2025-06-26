@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EDGAR Filings Query Tool</title>
+    <!-- Bootstrap CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <!-- React and Babel CDNs -->
+    <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.25.7/babel.min.js"></script>
+    <!-- Marked.js for Markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@12.0.1/lib/marked.umd.min.js"></script>
+    <style>
+      body {
+        background-color: #f8f9fa;
+      }
+      .chat-container {
+        height: calc(100vh - 200px);
+        overflow-y: auto;
+        scroll-behavior: smooth;
+        padding: 20px;
+        width: 100%;
+      }
+      .chat-message.user {
+        background-color: #d8b4fe;
+        border-radius: 16px 16px 4px 16px;
+        width: 100%;
+        padding: 10px 15px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      }
+      .chat-message.assistant {
+        background-color: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 16px 16px 16px 4px;
+        width: 100%;
+        padding: 10px 15px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      }
+      .chat-message .role-label {
+        font-size: 0.8rem;
+        color: #6b7280;
+        margin-bottom: 5px;
+      }
+      .input-container {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background-color: #ffffff;
+        border-top: 1px solid #e5e7eb;
+        padding: 15px;
+      }
+      .welcome-message {
+        text-align: center;
+        color: #6b7280;
+        padding: 40px 20px;
+      }
+      .spinner-container {
+        text-align: center;
+        padding: 20px;
+      }
+      /* Markdown styling */
+      .chat-message.assistant h1,
+      .chat-message.assistant h2,
+      .chat-message.assistant h3,
+      .chat-message.assistant h4,
+      .chat-message.assistant h5,
+      .chat-message.assistant h6 {
+        margin-top: 0.5rem;
+        margin-bottom: 0.5rem;
+        font-weight: 600;
+      }
+      .chat-message.assistant table {
+        border-collapse: collapse;
+        margin: 1rem 0;
+        width: 100%;
+      }
+      .chat-message.assistant th,
+      .chat-message.assistant td {
+        border: 1px solid #e5e7eb;
+        padding: 0.5rem;
+        text-align: left;
+      }
+      .chat-message.assistant th {
+        background-color: #f3f4f6;
+        font-weight: 600;
+      }
+      .chat-message.assistant code {
+        background-color: #f3f4f6;
+        border-radius: 0.25rem;
+        padding: 0.1rem 0.25rem;
+        font-family: monospace;
+      }
+      .chat-message.assistant pre {
+        background-color: #f3f4f6;
+        border-radius: 0.25rem;
+        padding: 0.5rem;
+        overflow-x: auto;
+      }
+      .chat-message.assistant blockquote {
+        border-left: 4px solid #e5e7eb;
+        padding-left: 1rem;
+        color: #6b7280;
+        margin-left: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useState, useEffect, useRef } = React;
+
+      const ChatApp = () => {
+        const [messages, setMessages] = useState([]);
+        const [input, setInput] = useState("");
+        const [isLoading, setIsLoading] = useState(false);
+        const chatContainerRef = useRef(null);
+
+        // Auto-scroll to bottom when messages change
+        useEffect(() => {
+          if (chatContainerRef.current) {
+            chatContainerRef.current.scrollTop =
+              chatContainerRef.current.scrollHeight;
+          }
+        }, [messages]);
+
+        // Handle sending a message
+        const handleSend = async () => {
+          if (!input.trim()) return;
+
+          const userMessage = { role: "user", content: input };
+          setMessages([...messages, userMessage]);
+          setInput("");
+          setIsLoading(true);
+          try {
+            const response = await fetch("http://localhost:8000/query", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ query: input }),
+            });
+            const data = await response.json();
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "assistant",
+                content: data.markdown_response || "No response received.",
+                sql_query: data.sql_query,
+                error: data.error,
+              },
+            ]);
+          } catch (error) {
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "assistant",
+                content: "Error processing your request.",
+                error: error.message,
+              },
+            ]);
+          } finally {
+            setIsLoading(false);
+          }
+        };
+
+        // Handle clear chat
+        const handleClear = () => {
+          setMessages([]);
+        };
+
+        // Handle Enter key press
+        const handleKeyPress = (e) => {
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            handleSend();
+          }
+        };
+
+        return (
+          <div className="container-fluid py-4">
+            <h1 className="text-center mb-4">EDGAR Filings Query Tool</h1>
+            {/* Chat Container */}
+            <div className="chat-container" ref={chatContainerRef}>
+              {messages.length === 0 ? (
+                <div className="welcome-message">
+                  <h3>Welcome to EDGAR Filings Query Tool</h3>
+                  <p>Ask questions about SEC filings. Try:</p>
+                  <ul className="list-unstyled">
+                    <li>How many 10-K filings were made?</li>
+                    <li>Show me Apple's recent filings</li>
+                    <li>Which companies had the most 8-K filings?</li>
+                  </ul>
+                </div>
+              ) : (
+                messages.map((msg, index) => (
+                  <div key={index} className={`chat-message ${msg.role} mb-3`}>
+                    {" "}
+                    <div className="role-label">
+                      {msg.role === "user" ? "You" : "Assistant"}
+                    </div>
+                    {msg.role === "user" ? (
+                      <div>{msg.content}</div>
+                    ) : (
+                      <div
+                        dangerouslySetInnerHTML={{
+                          __html: marked.parse(msg.content),
+                        }}
+                      ></div>
+                    )}
+                    {msg.role === "assistant" && (
+                      <div className="mt-2">
+                        {msg.sql_query && (
+                          <details className="small">
+                            <summary>🔍 View SQL Query</summary>
+                            <pre className="bg-light p-2 rounded">
+                              {msg.sql_query}
+                            </pre>
+                          </details>
+                        )}
+                        {msg.sql_prompt && (
+                          <details className="small">
+                            <summary>🧠 View Prompts</summary>
+                            <div className="bg-light p-2 rounded">
+                              <p>
+                                <strong>SQL Generation:</strong>
+                              </p>
+                              <p>{msg.sql_prompt}</p>
+                              {msg.response_prompt && (
+                                <>
+                                  <p>
+                                    <strong>Response Generation:</strong>
+                                  </p>
+                                  <p>{msg.response_prompt}</p>
+                                </>
+                              )}
+                            </div>
+                          </details>
+                        )}
+                        {msg.error && (
+                          <div className="alert alert-danger mt-2" role="alert">
+                            {msg.error}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+              {isLoading && (
+                <div className="spinner-container">
+                  <div className="spinner-border text-primary" role="status">
+                    <span className="visually-hidden">Loading...</span>
+                  </div>
+                </div>
+              )}{" "}
+            </div>{" "}
+            {/* Input Container */}{" "}
+            <div className="input-container">
+              <div className="row g-2 align-items-center container-fluid mx-0">
+                <div className="col col-md">
+                  <textarea
+                    className="form-control"
+                    placeholder="Ask about SEC filings..."
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    rows="2"
+                    style={{ resize: "none" }}
+                  />
+                </div>
+                <div className="col-auto">
+                  <div className="d-flex gap-2">
+                    <button
+                      className="btn btn-primary rounded-circle"
+                      onClick={handleSend}
+                      disabled={isLoading}
+                      title="Send"
+                      style={{
+                        width: "46px",
+                        height: "46px",
+                        padding: "6px 0px",
+                      }}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="20"
+                        height="20"
+                        fill="currentColor"
+                        className="bi bi-send-fill"
+                        viewBox="0 0 16 16"
+                      >
+                        <path d="M15.964.686a.5.5 0 0 0-.65-.65L.767 5.855H.766l-.452.18a.5.5 0 0 0-.082.887l.41.26.001.002 4.995 3.178 3.178 4.995.002.002.26.41a.5.5 0 0 0 .886-.083l6-15Zm-1.833 1.89L6.637 10.07l-.215-.338a.5.5 0 0 0-.154-.154l-.338-.215 7.494-7.494 1.178-.471-.47 1.178Z" />
+                      </svg>
+                    </button>
+                    <button
+                      className="btn btn-danger rounded-circle"
+                      onClick={handleClear}
+                      disabled={isLoading}
+                      title="Clear"
+                      style={{
+                        width: "46px",
+                        height: "46px",
+                        padding: "6px 0px",
+                      }}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="20"
+                        height="20"
+                        fill="currentColor"
+                        className="bi bi-trash-fill"
+                        viewBox="0 0 16 16"
+                      >
+                        <path d="M2.5 1a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1H3v9a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V4h.5a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H10a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1zm3 4a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 .5-.5M8 5a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7A.5.5 0 0 1 8 5m3 .5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 1 0" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      const root = ReactDOM.createRoot(document.getElementById("root"));
+      root.render(<ChatApp />);
+    </script>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  </body>
+</html>

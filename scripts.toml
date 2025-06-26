@@ -1,0 +1,52 @@
+# UV Task Scripts for EDGAR Query Tool
+# Run these with: uv run --script <script-name>
+
+[run]
+# Main application scripts
+api = "python main_api.py"
+web = "python main_web.py"
+
+# Development scripts  
+test = "pytest tests/ -v"
+test-cov = "pytest tests/ --cov=src/edgar_query --cov-report=html"
+lint = "ruff check src/ tests/"
+lint-fix = "ruff check src/ tests/ --fix"
+lint-fix-unsafe = "ruff check src/ tests/ --fix --unsafe-fixes"
+format = "ruff format src/ tests/"
+format-check = "ruff format src/ tests/ --check"
+type-check = "mypy src/"
+qa = "ruff check src/ tests/ --fix && ruff format src/ tests/ && mypy src/"
+
+# Setup scripts
+setup-data = """
+python -c "
+import os
+from pathlib import Path
+Path('data/edgar_data').mkdir(parents=True, exist_ok=True)
+Path('data/backups').mkdir(parents=True, exist_ok=True)
+print('Data directories created')
+"
+"""
+
+check-env = """
+python -c "
+import os
+print('OPENAI_API_KEY:', 'SET' if os.getenv('OPENAI_API_KEY') else 'NOT SET')
+"
+"""
+
+# Build and distribution
+build = "uv build"
+clean = """
+python -c "
+import shutil
+from pathlib import Path
+for path in ['build', 'dist', '*.egg-info']:
+    if Path(path).exists():
+        if Path(path).is_dir():
+            shutil.rmtree(path)
+        else:
+            Path(path).unlink()
+print('Build artifacts cleaned')
+"
+"""
