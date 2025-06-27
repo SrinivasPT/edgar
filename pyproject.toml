@@ -47,17 +47,18 @@ dev = [
     "pre-commit>=3.0.0",
 ]
 
-[project.scripts]
-edgar-api = "edgar_query.api.server:main"
-edgar-web = "edgar_query.web.server:main"
-
 [project.urls]
 Homepage = "https://github.com/example/edgar-query-tool"
 Repository = "https://github.com/example/edgar-query-tool.git"
 "Bug Tracker" = "https://github.com/example/edgar-query-tool/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/edgar_query"]
+packages = ["edgar"]
+
+[project.scripts]
+edgar = "edgar.cli:main"
+edgar-api = "edgar.api:main"
+edgar-web = "edgar.web:main"
 
 [tool.ruff]
 target-version = "py38"

@@ -1,9 +1,9 @@
-from edgar_query.agents.sql_executor import SQLExecutorAgent
+from edgar.services.sql_executor import SQLExecutorService
 
 
 def test_sql_executor_forbidden_operations(temp_db):
     """Test that forbidden SQL operations are blocked."""
-    executor = SQLExecutorAgent(temp_db)
+    executor = SQLExecutorService(temp_db)
 
     forbidden_queries = [
         "DROP TABLE filings",
@@ -18,23 +18,24 @@ def test_sql_executor_forbidden_operations(temp_db):
     for query in forbidden_queries:
         result, error = executor.execute_sql_query(query)
         assert result is None
+        assert error is not None
         assert "forbidden operations" in error.lower()
 
 
 def test_sql_executor_valid_select(temp_db):
     """Test that valid SELECT queries work."""
-    executor = SQLExecutorAgent(temp_db)
+    executor = SQLExecutorService(temp_db)
 
     result, error = executor.execute_sql_query("SELECT COUNT(*) as count FROM filings")
     assert error is None
     assert result is not None
     assert len(result) == 1
-    assert result.iloc[0]["count"] == 3
+    assert int(result.iloc[0]["count"].item()) == 3
 
 
 def test_sql_executor_invalid_syntax(temp_db):
     """Test handling of invalid SQL syntax."""
-    executor = SQLExecutorAgent(temp_db)
+    executor = SQLExecutorService(temp_db)
 
     result, error = executor.execute_sql_query("SELECT * FROM nonexistent_table")
     assert result is None

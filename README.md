@@ -52,18 +52,18 @@ An intelligent SEC EDGAR filings query tool that leverages Large Language Models
    # Run both the FastAPI server and web app (Windows)
    scripts\start_services.bat
    
-   # Or run individually with uv:
+   # Or run individually:
    # Run just the API server
-   uv run python main_api.py
+   edgar-api
    
    # Run just the web server
-   uv run python main_web.py
+   edgar-web
    
-   # Other useful commands:
-   uv run pytest tests/         # Run tests
-   uv run ruff check src/       # Lint code  
-   uv run ruff format src/      # Format code
-   uv run mypy src/            # Type checking
+   # Development commands:
+   python dev.py test           # Run tests
+   python dev.py lint-fix       # Fix code issues
+   python dev.py format         # Format code
+   python dev.py qa            # Full quality check
    ```
 
 ## Usage
@@ -174,14 +174,15 @@ edgar-query-tool/
 ├── data/                        # Data files and database
 │   ├── edgar_data/             # Downloaded EDGAR data
 │   └── edgar_filings.db        # SQLite database
-├── static/                      # Static web assets
+├── edgar/                       # Main package
+│   ├── api/                    # FastAPI server
+│   ├── web/                    # Web interface
+│   ├── services/               # Business services
+│   ├── core/                   # Core business logic
+│   └── cli/                    # Command-line interface
 ├── docs/                        # Documentation
 ├── tests/                       # Unit tests
 ├── scripts/                     # Helper scripts
-├── main_api.py                  # API server entry point
-├── main_web.py                  # Web server entry point
-├── requirements.txt             # Python dependencies
-├── setup.py                     # Package setup
 └── pyproject.toml              # Modern Python packaging
 ```
 
@@ -211,17 +212,17 @@ For developers who want to contribute or modify the code:
    ```bash
    uv run pytest tests/
    # With coverage
-   uv run pytest tests/ --cov=src/edgar_query --cov-report=html
+   uv run pytest tests/ --cov=edgar --cov-report=html
    ```
 
 6. Code quality checks:
    ```bash
    # Lint and format code
-   uv run ruff check src/ tests/
-   uv run ruff format src/ tests/
+   uv run ruff check edgar/ tests/
+   uv run ruff format edgar/ tests/
    
    # Type checking
-   uv run mypy src/
+   uv run mypy edgar/
    ```
 
 ### UV Commands Reference
@@ -234,14 +235,14 @@ uv add <package>                 # Add new dependency
 uv remove <package>              # Remove dependency
 
 # Running code
-uv run python main_api.py        # Run API server
-uv run python main_web.py        # Run web server
+edgar-api                        # Run API server
+edgar-web                        # Run web server
 uv run pytest tests/             # Run tests
 
 # Code quality
-uv run ruff check src/           # Lint code
-uv run ruff format src/          # Format code
-uv run mypy src/                 # Type checking
+uv run ruff check edgar/         # Lint code
+uv run ruff format edgar/        # Format code
+uv run mypy edgar/               # Type checking
 
 # Building
 uv build                         # Build package
