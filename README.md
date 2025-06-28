@@ -97,14 +97,14 @@ The tool can understand and respond to natural language queries such as:
 The tool works with two main tables:
 
 ### filings
-- `cik`: Company Central Index Key
+- `cik`: Company Central Index Key (INTEGER)
 - `company_name`: Official company name
 - `form_type`: SEC form type (10-K, 10-Q, 8-K, etc.)
 - `date_filed`: Filing date
 - `filename`: Path to the filing document
 
 ### companies
-- `cik`: Company Central Index Key (Primary Key)
+- `cik`: Company Central Index Key (INTEGER, Primary Key)
 - `name`: Company name
 - `sic`: Standard Industrial Classification code
 - `business_address`: Company business address

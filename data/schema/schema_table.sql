@@ -2,7 +2,7 @@
 
 -- Create the master index table to store basic company information
 CREATE TABLE IF NOT EXISTS master_index (
-    cik TEXT, 
+    cik INTEGER, 
     company_name TEXT, 
     form_type TEXT, 
     date_filed TEXT, 

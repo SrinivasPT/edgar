@@ -22,7 +22,7 @@ def temp_db():
     conn.execute(
         """
         CREATE TABLE filings (
-            cik TEXT,
+            cik INTEGER,
             company_name TEXT,
             form_type TEXT,
             date_filed TEXT,

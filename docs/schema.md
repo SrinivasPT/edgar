@@ -39,7 +39,7 @@ Stores SEC filing records from `master.idx`.
 **Schema**:
 ```sql
 CREATE TABLE master_index (
-    cik TEXT,
+    cik INTEGER,
     company_name TEXT,
     form_type TEXT,
     date_filed TEXT,
@@ -48,7 +48,7 @@ CREATE TABLE master_index (
 ```
 
 **Key Details**:
-- `cik`: Company identifier (TEXT, no leading zeros, e.g., `1000045`)
+- `cik`: Company identifier (INTEGER, no leading zeros, e.g., `1000045`)
 - `company_name`: UPPERCASE company name (e.g., `OLD MARKET CAPITAL Corp`)
 - `form_type`: SEC form type (e.g., `10-K`, `10-Q`, `8-K`, `13F-HR`)
 - `date_filed`: Filing date (YYYY-MM-DD, e.g., `2025-02-14`)
@@ -128,7 +128,7 @@ CREATE TABLE presentation_of_statement (
 
 ## Table Relationships
 - **Join `master_index` and `submissions`**:
-  - Use `CAST(submissions.cik AS TEXT) = master_index.cik` due to different data types.
+  - Use `submissions.cik = master_index.cik` for direct INTEGER-to-INTEGER joins.
   - Use `LEFT JOIN` with `master_index` as the driving table to include all filings, as `submissions` may not have entries for non-XBRL filings.
 - **Join `submissions` and `presentation_of_statement`**:
   - Use `presentation_of_statement.adsh = submissions.adsh`.
@@ -148,8 +148,8 @@ CREATE TABLE presentation_of_statement (
 
 ### 2. Handling Input Data
 - **CIK**:
-  - Remove leading zeros from `master.idx` CIK values (e.g., `0001000045` → `1000045`).
-  - Convert `submissions.cik` to TEXT when joining with `master_index`.
+  - Remove leading zeros from `master.idx` CIK values during data loading (e.g., `0001000045` → `1000045`).
+  - Both tables now use INTEGER type for direct joins.
 - **Company Name**:
   - Use `UPPER()` for case-insensitive searches in `master_index.company_name`.
   - Support partial matches with `LIKE '%TERM%'`.
@@ -181,7 +181,7 @@ The LLM should generate queries tailored to the following categories, using `mas
    ```sql
    SELECT m.cik, m.company_name, m.form_type, m.date_filed, s.afs, s.wksi
    FROM master_index m
-   LEFT JOIN submissions s ON CAST(s.cik AS TEXT) = m.cik
+   LEFT JOIN submissions s ON s.cik = m.cik
    WHERE UPPER(m.company_name) LIKE '%XYZ CORPORATION%'
      AND (s.afs IN ('LAF', 'ACC', 'SRA') OR m.form_type LIKE 'SBSE%')
    ORDER BY m.date_filed DESC
@@ -193,7 +193,7 @@ The LLM should generate queries tailored to the following categories, using `mas
    ```sql
    SELECT DISTINCT m.cik, m.company_name, m.form_type, m.date_filed
    FROM master_index m
-   LEFT JOIN submissions s ON CAST(s.cik AS TEXT) = m.cik
+   LEFT JOIN submissions s ON s.cik = m.cik
    WHERE m.form_type LIKE 'SBSE%'
      AND m.date_filed <= '2025-06-30'
    ORDER BY m.company_name;
@@ -204,7 +204,7 @@ The LLM should generate queries tailored to the following categories, using `mas
    ```sql
    SELECT DISTINCT m.cik, m.company_name, m.form_type, m.date_filed, s.sic
    FROM master_index m
-   LEFT JOIN submissions s ON CAST(s.cik AS TEXT) = m.cik
+   LEFT JOIN submissions s ON s.cik = m.cik
    WHERE m.form_type IN ('13F-HR', '13F-NT')
      AND m.date_filed BETWEEN '2025-01-01' AND '2025-03-31'
      AND (s.sic BETWEEN 3570 AND 3579 OR s.sic IS NULL)
@@ -224,7 +224,7 @@ The LLM should generate queries tailored to the following categories, using `mas
    ```sql
    SELECT m.cik, m.company_name, m.form_type, m.date_filed, s.sic, s.countryba, s.stprba, s.cityba, s.zipba, s.bas1, s.bas2
    FROM master_index m
-   LEFT JOIN submissions s ON CAST(s.cik AS TEXT) = m.cik
+   LEFT JOIN submissions s ON s.cik = m.cik
    WHERE UPPER(m.company_name) LIKE '%ABC HOLDING%'
    ORDER BY m.date_filed DESC
    LIMIT 1;
@@ -235,7 +235,7 @@ The LLM should generate queries tailored to the following categories, using `mas
    ```sql
    SELECT m.cik, m.company_name, m.form_type, m.date_filed, s.sic, s.countryba, s.stprba, s.cityba
    FROM master_index m
-   LEFT JOIN submissions s ON CAST(s.cik AS TEXT) = m.cik
+   LEFT JOIN submissions s ON s.cik = m.cik
    WHERE UPPER(m.company_name) LIKE '%APPLE%'
    ORDER BY m.date_filed DESC
    LIMIT 10;
@@ -246,7 +246,7 @@ The LLM should generate queries tailored to the following categories, using `mas
    ```sql
    SELECT m.cik, m.company_name, m.form_type, m.date_filed
    FROM master_index m
-   LEFT JOIN submissions s ON CAST(s.cik AS TEXT) = m.cik
+   LEFT JOIN submissions s ON s.cik = m.cik
    WHERE UPPER(m.company_name) LIKE '%ABC INC%'
      AND m.form_type = '10-K'
    ORDER BY m.date_filed DESC
@@ -259,7 +259,7 @@ The LLM should generate queries tailored to the following categories, using `mas
    SELECT DISTINCT m.cik, m.company_name, m.form_type, m.date_filed, m.filename,
           s.name, s.afs, s.wksi
    FROM master_index m
-   LEFT JOIN submissions s ON CAST(s.cik AS TEXT) = m.cik
+   LEFT JOIN submissions s ON s.cik = m.cik
    WHERE m.date_filed >= date('2025-06-28', '-7 days')
    ORDER BY m.company_name;
    ```
@@ -277,7 +277,7 @@ The LLM should generate queries tailored to the following categories, using `mas
    ```sql
    SELECT COUNT(*) AS filing_count
    FROM master_index m
-   LEFT JOIN submissions s ON CAST(s.cik AS TEXT) = m.cik
+   LEFT JOIN submissions s ON s.cik = m.cik
    WHERE m.form_type = '10-K'
      AND m.date_filed BETWEEN '2025-01-01' AND '2025-03-31'
      AND (s.sic LIKE '60%' OR s.sic IS NULL);
@@ -288,7 +288,7 @@ The LLM should generate queries tailored to the following categories, using `mas
    ```sql
    SELECT m.cik, m.company_name, m.form_type, m.date_filed, s.afs, s.filed
    FROM master_index m
-   LEFT JOIN submissions s ON CAST(s.cik AS TEXT) = m.cik
+   LEFT JOIN submissions s ON s.cik = m.cik
    WHERE m.date_filed >= '2024-06-28'
      AND s.afs IS NOT NULL
    ORDER BY m.company_name, s.filed;
@@ -299,7 +299,7 @@ The LLM should generate queries tailored to the following categories, using `mas
    ```sql
    SELECT m.cik, m.company_name, m.form_type, m.date_filed
    FROM master_index m
-   LEFT JOIN submissions s ON CAST(s.cik AS TEXT) = m.cik
+   LEFT JOIN submissions s ON s.cik = m.cik
    WHERE m.form_type IN ('10-K', '8-K')
      AND m.date_filed >= date('2025-06-28', '-30 days')
    GROUP BY m.cik, s.name
@@ -318,7 +318,7 @@ The LLM should generate queries tailored to the following categories, using `mas
    ```sql
    SELECT m.cik, m.company_name, m.form_type, m.date_filed, s.afs
    FROM master_index m
-   LEFT JOIN submissions s ON CAST(s.cik AS TEXT) = m.cik
+   LEFT JOIN submissions s ON s.cik = m.cik
    WHERE m.form_type IN ('13F-HR', '13F-NT')
      AND (s.afs NOT IN ('LAF', 'ACC', 'SRA') OR s.afs IS NULL)
      AND m.date_filed <= '2025-06-30';
@@ -329,7 +329,7 @@ The LLM should generate queries tailored to the following categories, using `mas
    ```sql
    SELECT m.cik, m.company_name, m.form_type, m.date_filed
    FROM master_index m
-   LEFT JOIN submissions s ON CAST(s.cik AS TEXT) = m.cik
+   LEFT JOIN submissions s ON s.cik = m.cik
    WHERE s.afs IS NULL
    ORDER BY m.company_name;
    ```
@@ -339,7 +339,7 @@ The LLM should generate queries tailored to the following categories, using `mas
    ```sql
    SELECT DISTINCT m.cik, m.company_name, m.form_type, m.date_filed
    FROM master_index m
-   LEFT JOIN submissions s ON CAST(s.cik AS TEXT) = m.cik
+   LEFT JOIN submissions s ON s.cik = m.cik
    WHERE m.form_type != '10-K'
      OR m.date_filed < '2024-06-28'
    ORDER BY m.company_name;
@@ -357,7 +357,7 @@ The LLM should generate queries tailored to the following categories, using `mas
    ```sql
    SELECT m.cik, m.company_name, m.form_type, m.date_filed, s.afs, s.sic, s.countryba, s.stprba, s.cityba
    FROM master_index m
-   LEFT JOIN submissions s ON CAST(s.cik AS TEXT) = m.cik
+   LEFT JOIN submissions s ON s.cik = m.cik
    WHERE s.afs IN ('LAF', 'ACC', 'SRA')
      AND (s.sic BETWEEN 8000 AND 8099 OR s.sic IS NULL)
    ORDER BY m.company_name;
@@ -368,7 +368,7 @@ The LLM should generate queries tailored to the following categories, using `mas
    ```sql
    SELECT m.cik, m.company_name, m.form_type, m.date_filed
    FROM master_index m
-   LEFT JOIN submissions s ON CAST(s.cik AS TEXT) = m.cik
+   LEFT JOIN submissions s ON s.cik = m.cik
    WHERE m.form_type = '8-K'
      AND m.date_filed <= '2025-06-30'
    ORDER BY m.date_filed DESC;
@@ -379,7 +379,7 @@ The LLM should generate queries tailored to the following categories, using `mas
    ```sql
    SELECT m.cik, m.company_name, m.form_type, m.date_filed, s.afs, s.sic
    FROM master_index m
-   LEFT JOIN submissions s ON CAST(s.cik AS TEXT) = m.cik
+   LEFT JOIN submissions s ON s.cik = m.cik
    WHERE s.afs IN ('LAF', 'ACC', 'SRA')
      AND (s.sic LIKE '60%' OR s.sic IS NULL)
    ORDER BY m.company_name;
@@ -420,7 +420,7 @@ The LLM should generate queries tailored to the following categories, using `mas
    ```sql
    SELECT m.cik, m.company_name, m.form_type, m.date_filed, s.sic, s.countryba, s.stprba, s.cityba
    FROM master_index m
-   LEFT JOIN submissions s ON CAST(s.cik AS TEXT) = m.cik
+   LEFT JOIN submissions s ON s.cik = m.cik
    WHERE UPPER(m.company_name) LIKE '%APPLE%'
    ORDER BY m.date_filed DESC
    LIMIT 10;
