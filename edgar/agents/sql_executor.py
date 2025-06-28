@@ -1,7 +1,7 @@
 import pandas as pd
 
 
-class SQLExecutorService:
+class SQLExecutorAgent:
     def __init__(self, conn):
         self.conn = conn
 

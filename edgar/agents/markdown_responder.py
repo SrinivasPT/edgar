@@ -3,7 +3,7 @@ import os
 from openai import OpenAI
 
 
-class MarkdownResponderService:
+class MarkdownResponderAgent:
     def __init__(self):
         self.openai_client = None
         api_key = os.getenv("OPENAI_API_KEY")

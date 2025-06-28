@@ -5,7 +5,7 @@ from pathlib import Path
 from openai import OpenAI
 
 
-class SQLGeneratorService:
+class SQLGeneratorAgent:
     def __init__(self):
         self.openai_client = None
         api_key = os.getenv("OPENAI_API_KEY")
@@ -30,16 +30,7 @@ class SQLGeneratorService:
                     return f.read()
 
         # Return a basic schema if file not found
-        return """
-        Database Schema:
-
-        Table: filings
-        - cik: Company Central Index Key (TEXT)
-        - company_name: Company name (TEXT)
-        - form_type: SEC form type like 10-K, 10-Q, 8-K (TEXT)
-        - date_filed: Filing date in YYYY-MM-DD format (TEXT)
-        - filename: Path to filing document (TEXT)
-        """
+        return "Database Schema is not available. Using default schema"
 
     def normalize_cik_in_query(self, user_query):
         cik_pattern = r"\\b0+(\\d{1,10})\\b"
@@ -66,14 +57,19 @@ class SQLGeneratorService:
         Rules based on the schema above:
         1. Only return the SQL query, no explanations
         2. Use proper SQL syntax for SQLite
-        3. **Use COUNT(*) for counting only. For other queries, return the full data.**
+        3. Use COUNT(*) for counting only. For other queries, return the full data
         4. Return only SELECT statements
         5. Use LIKE for partial matches with % wildcards
         6. For company names, always use UPPER(company_name) LIKE '%SEARCHTERM%' for case-insensitive partial matches
         7. For form types, always identify and convert the user-entered value to the closest standard form type used in the database (e.g., map '24-F' to '24F', '10 K' to '10-K', etc.), then if the form type may have variants, use form_type LIKE 'STANDARD%' to match all related types
         8. Follow the CIK handling and company name matching rules specified in the schema
         9. Use the query patterns provided in the schema as examples
-          SQL Query:
+
+        **Ensure that you follow these rules:**
+        1. Limit the number of results to max 10 whenever limit is applicable
+        2. Always use SELECT * in the query unless you need to apply DISTINCT
+
+        SQL Query:
         """
         try:
             response = self.openai_client.chat.completions.create(
@@ -85,7 +81,7 @@ class SQLGeneratorService:
                     },
                     {"role": "user", "content": prompt},
                 ],
-                max_tokens=200,
+                max_tokens=500,
             )
             if response.choices and response.choices[0].message.content:
                 sql_query = response.choices[0].message.content.strip()

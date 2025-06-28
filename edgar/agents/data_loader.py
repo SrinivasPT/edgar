@@ -4,7 +4,7 @@ from pathlib import Path
 import pandas as pd
 
 
-class DataLoaderService:
+class DataLoaderAgent:
     def __init__(self, db_path=None, data_folder=None):
         # Get project root directory (go up from edgar/services/)
         project_root = Path(__file__).parent.parent.parent
