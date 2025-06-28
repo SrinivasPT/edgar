@@ -66,7 +66,7 @@ class SQLGeneratorService:
         Rules based on the schema above:
         1. Only return the SQL query, no explanations
         2. Use proper SQL syntax for SQLite
-        3. Use COUNT(*) for counting only. For other queries, return the full data.
+        3. **Use COUNT(*) for counting only. For other queries, return the full data.**
         4. Return only SELECT statements
         5. Use LIKE for partial matches with % wildcards
         6. For company names, always use UPPER(company_name) LIKE '%SEARCHTERM%' for case-insensitive partial matches
@@ -90,10 +90,12 @@ class SQLGeneratorService:
             if response.choices and response.choices[0].message.content:
                 sql_query = response.choices[0].message.content.strip()
                 sql_query = sql_query.replace("```sql", "").replace("```", "").strip()
+                print(f"Generated SQL Query: {sql_query}")
                 return sql_query, prompt
             else:
                 print("No response received from OpenAI API")
                 return None, prompt
+
         except Exception as e:
             print(f"Error generating SQL: {e}")
             return None, prompt

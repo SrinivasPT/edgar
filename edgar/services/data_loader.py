@@ -1,5 +1,4 @@
 import sqlite3
-import zipfile
 from pathlib import Path
 
 import pandas as pd
@@ -10,80 +9,94 @@ class DataLoaderService:
         # Get project root directory (go up from edgar/services/)
         project_root = Path(__file__).parent.parent.parent
 
-        # Set default paths relative to project root
-        if db_path is None:
-            db_path = project_root / "data" / "edgar_filings.db"
-        if data_folder is None:
-            data_folder = project_root / "data" / "edgar_data"
+        self.db_path = project_root / "data" / "edgar_filings.db"
+        self.data_folder = project_root / "data" / "edgar_data"
 
-        self.db_path = str(db_path)
-        self.data_folder = Path(data_folder)
+        self.schema_table_file_path = (
+            project_root / "data" / "schema" / "schema_table.sql"
+        )
+        self.schema_index_file_path = (
+            project_root / "data" / "schema" / "schema_index.sql"
+        )
+
         self.master_zip_file = self.data_folder / "master.zip"
         self.master_idx_file = self.data_folder / "master.idx"
+
+        self.sub_file = self.data_folder / "sub.txt"
+        self.pre_file = self.data_folder / "pre.txt"
+
         self.conn = None
 
         # Create data folder if it doesn't exist
         self.data_folder.mkdir(parents=True, exist_ok=True)
 
     def init_db(self):
-        # Ensure the database directory exists
         Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
-
         self.conn = sqlite3.connect(self.db_path)
-        self.conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS filings (
-                cik TEXT, company_name TEXT, form_type TEXT, date_filed TEXT, filename TEXT
-            )
-            """
-        )
+
+        if self.db_path.exists():
+            print(f"Database already exists at {self.db_path}.")
+            return self.conn
+
+        with open(self.schema_table_file_path, "r") as schema_file:
+            schema_sql = schema_file.read()
+            self.conn.executescript(schema_sql)
+            self.conn.commit()
+
+        self.load_master_data()
+        self.load_sub_data()
+        self.load_pre_data()
+
+        with open(self.schema_index_file_path, "r") as schema_file:
+            schema_sql = schema_file.read()
+            self.conn.executescript(schema_sql)
+            self.conn.commit()
+
         return self.conn
 
-    def extract_master_index(self):
-        if self.master_idx_file.exists():
-            print("Master index file already extracted, using cached version")
-            return True
-        try:
-            if not self.master_zip_file.exists():
-                print("Master zip file not found")
-                return False
-            print("Extracting master index file...")
-            with zipfile.ZipFile(self.master_zip_file) as z:
-                with z.open("master.idx") as idx_file:
-                    with open(self.master_idx_file, "wb") as f:
-                        f.write(idx_file.read())
-            print("Master index file extracted successfully")
-            return True
-        except Exception as e:
-            print(f"Error extracting master index: {e}")
-            return False
-
-    def load_master_index(self):
-        try:
-            if not self.extract_master_index():
-                return False
-            print("Loading master index into database...")
-            df = pd.read_csv(
-                self.master_idx_file,
-                sep="|",
-                encoding="latin-1",
-                skiprows=10,
-                names=["cik", "company_name", "form_type", "date_filed", "filename"],
+    def load_master_data(self) -> bool:
+        if not self.master_idx_file.exists():
+            raise FileNotFoundError(
+                f"Master index file not found: {self.master_idx_file}"
             )
-            df.to_sql("filings", self.conn, if_exists="replace", index=False)
-            print(f"Loaded {len(df)} filings into database")
-            return True
-        except Exception as e:
-            print(f"Error loading master index: {e}")
-            return False
 
-    def clear_cached_data(self):
-        try:
-            if self.master_zip_file.exists():
-                self.master_zip_file.unlink()
-            if self.master_idx_file.exists():
-                self.master_idx_file.unlink()
-            return True
-        except Exception as e:
-            print(f"Error clearing cache: {e}")
-            return False
+        print("Loading master index into database...")
+        df = pd.read_csv(
+            self.master_idx_file,
+            sep="|",
+            encoding="latin-1",
+            skiprows=10,
+            names=["cik", "company_name", "form_type", "date_filed", "filename"],
+            dtype=str,
+            low_memory=False,
+        )
+
+        df.to_sql("master_index", self.conn, if_exists="replace", index=False)
+
+        return True
+
+    def load_pre_data(self) -> bool:
+        """Load pre.txt file containing presentation data."""
+        pre_file = self.data_folder / "pre.txt"
+        if not pre_file.exists():
+            raise FileNotFoundError(f"Pre file not found: {pre_file}")
+
+        df = pd.read_csv(pre_file, sep="\t", dtype=str, low_memory=False)
+
+        df.to_sql(
+            "presentation_of_statement", self.conn, if_exists="replace", index=False
+        )
+
+        return True
+
+    def load_sub_data(self) -> bool:
+        """Load sub.txt file containing submission data."""
+        sub_file = self.data_folder / "sub.txt"
+
+        if not sub_file.exists():
+            raise FileNotFoundError(f"Sub file not found: {sub_file}")
+
+        df = pd.read_csv(sub_file, sep="\t", dtype=str, low_memory=False)
+        df.to_sql("submissions", self.conn, if_exists="replace", index=False)
+
+        return True

@@ -23,10 +23,6 @@ class EdgarQueryEngine:
         self.sql_executor = SQLExecutorService(conn)
         return conn
 
-    def load_data(self):
-        """Load EDGAR filing data into the database."""
-        return self.data_loader.load_master_index()
-
     def query(self, user_query):
         """Execute a natural language query and return formatted results."""
         if not self.sql_executor:

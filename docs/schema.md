@@ -1,119 +1,421 @@
-# EDGAR Filings Database Schema
+# Instructions for LLM to Generate SQL Queries for EDGAR Filings Database
 
-## Overview
-This SQLite database stores SEC EDGAR filing information downloaded from the SEC's quarterly master index files. The database is designed to support natural language queries for SEC filing analysis and research.
+## Objective
+Generate SQL `SELECT` queries dynamically for the `edgar_filings.db` SQLite database using data from `master.idx`, `pre.txt`, and `sub.txt` files. The queries should support natural language analysis of SEC EDGAR filings, addressing queries related to registration status, company metadata, filing history, audit/compliance, and advanced filtering/export. The database includes the `master_index`, `submissions`, and `presentation_of_statement` tables.
 
-## Database Connection
-- **File**: `edgar_filings.db` (SQLite 3)
-- **Location**: Root directory of the project
-- **Connection**: Standard SQLite connection using Python's `sqlite3` module
+## Database Overview
+- **Database File**: `edgar_filings.db` (SQLite 3)
+- **Tables**: `master_index`, `submissions`, `presentation_of_statement`
+- **Purpose**: Store and query SEC filing data for research, analysis, and compliance
+- **Constraints**: Only `SELECT` statements are allowed; `DROP`, `DELETE`, `INSERT`, `UPDATE`, `CREATE`, `ALTER`, `TRUNCATE` are prohibited
+- **Current Date**: Queries should assume the current date is June 28, 2025, unless specified otherwise
 
-## Tables
+## Input Data Files
+The following files from the EDGAR financial statements dataset provide the data to construct queries:
 
-### `filings` Table
-The main table containing SEC filing records from the quarterly master index.
+1. **master.idx**:
+   - Contains quarterly SEC filing records.
+   - Fields: `CIK`, `Company Name`, `Form Type`, `Date Filed`, `Filename`.
+   - Maps to the `master_index` table.
+   - Example: `1000045|OLD MARKET CAPITAL Corp|10-K|2025-02-14|edgar/data/1000045/0000950170-25-021128.txt`
 
-**Schema:**
+2. **sub.txt**:
+   - Contains detailed submission metadata.
+   - Fields: `adsh`, `cik`, `name`, `sic`, `form`, `period`, `filed`, `fy`, `fp`, `countryba`, `stprba`, `cityba`, `afs`, `wksi`, etc.
+   - Maps to the `submissions` table.
+   - Example: `0000012345-25-000001|1000045|Apple Inc.|3571|10-K|20241231|20250214|2024|FY`
+
+3. **pre.txt**:
+   - Contains financial statement presentation data.
+   - Fields: `adsh`, `report`, `line`, `stmt`, `tag`, `plabel`, `version`, etc.
+   - Maps to the `presentation_of_statement` table.
+   - Example: `0000012345-25-000001|1|100|BS|Assets|Total Assets|us-gaap/2023`
+
+## Database Schema
+
+### 1. `master_index` Table
+Stores SEC filing records from `master.idx`.
+
+**Schema**:
 ```sql
-CREATE TABLE "filings" (
-  "cik" TEXT,
-  "company_name" TEXT,
-  "form_type" TEXT,
-  "date_filed" TEXT,
-  "filename" TEXT
+CREATE TABLE master_index (
+    cik TEXT,
+    company_name TEXT,
+    form_type TEXT,
+    date_filed TEXT,
+    filename TEXT
 )
 ```
 
-**Column Details:**
-| Column | Type | Description | Example |
-|--------|------|-------------|---------|
-| `cik` | TEXT | Central Index Key - unique company identifier (WITHOUT leading zeros) | `1000045` |
-| `company_name` | TEXT | Company name in UPPERCASE format | `OLD MARKET CAPITAL Corp` |
-| `form_type` | TEXT | Type of SEC form filed | `10-K`, `10-Q`, `8-K`, `S-1`, `BD` |
-| `date_filed` | TEXT | Filing date in YYYY-MM-DD format | `2025-02-14` |
-| `filename` | TEXT | Path to the filing document on SEC servers | `edgar/data/1000045/0000950170-25-021128.txt` |
+**Key Details**:
+- `cik`: Company identifier (TEXT, no leading zeros, e.g., `1000045`)
+- `company_name`: UPPERCASE company name (e.g., `OLD MARKET CAPITAL Corp`)
+- `form_type`: SEC form type (e.g., `10-K`, `10-Q`, `8-K`, `13F-HR`)
+- `date_filed`: Filing date (YYYY-MM-DD, e.g., `2025-02-14`)
+- `filename`: Path to filing document (e.g., `edgar/data/1000045/0000950170-25-021128.txt`)
+- **Notes**: No primary key; allows duplicates; ~338,662 records for Q1 2025.
 
-**Data Characteristics:**
-- **Total Records**: ~338,662 filings (Q1 2025 data)
-- **CIK Format**: Stored WITHOUT leading zeros (e.g., `1000045` not `0001000045`)
-- **Company Names**: All stored in UPPERCASE
-- **Date Range**: Current quarter's filings
-- **No Primary Key**: Table allows duplicate entries
+### 2. `submissions` Table
+Stores submission metadata from `sub.txt`.
 
-
-**standard form_type**
-1, 1-A, 1-A/A, 1-A POS, 1-E, 1-E/A, 1-K, 1-SA, 1-U, 1-Z, 2-E, 3, 3/A, 4, 4/A, 5, 5/A, 6-K, 6-K/A, 8-A, 8-A/A, 8-B, 8-B/A, 8-K, 8-K/A, 8-K12B, 8-K12B/A, 8-K12G3, 8-K12G3/A, 8-K15D5, 8-K15D5/A, 10, 10/A, 10-C, 10-C/A, 10-D, 10-D/A, 10-K, 10-K/A, 10-KT, 10-KT/A, 10-Q, 10-Q/A, 10-QT, 10-QT/A, 11-K, 11-K/A, 13F-HR, 13F-HR/A, 13F-NT, 13F-NT/A, 15, 15/A, 15F, 15F/A, 18, 18/A, 18-K, 18-K/A, 20-F, 20-F/A, 24F-2NT, 24F-2NT/A, 25, 25/A, 25-NSE, 25-NSE/A, 40-17F1, 40-17F1/A, 40-17F2, 40-17F2/A, 40-17G, 40-17G/A, 40-202A, 40-202A/A, 40-206A, 40-206A/A, 40-APP, 40-APP/A, 40-F, 40-F/A, 40-OIP, 40-OIP/A, 48B-2NT, 48B-2NT/A, 144, 144/A, 425, 425/A, ABS-15G, ABS-15G/A, ABS-EE, ABS-EE/A, ARS, ARS/A, CB, CB/A, CFPORTAL, CFPORTAL/A, D, D/A, DEF 14A, DEF 14A/A, DEF 14C, DEF 14C/A, DEFA14A, DEFA14A/A, DEFM14A, DEFM14A/A, DEFM14C, DEFM14C/A, F-1, F-1/A, F-1MEF, F-3, F-3/A, F-3D, F-3D/A, F-3DPOS, F-3DPOS/A, F-4, F-4/A, F-4MEF, F-6, F-6/A, F-6 POS, F-7, F-7/A, F-8, F-8/A, F-10, F-10/A, F-10MEF, F-80, F-80/A, F-N, F-N/A, F-X, F-X/A, MA, MA/A, MA-I, MA-I/A, MA-W, N-1A, N-1A/A, N-2, N-2/A, N-2MEF, N-3, N-3/A, N-4, N-4/A, N-5, N-5/A, N-6, N-6/A, N-8B-2, N-8B-2/A, N-8B-4, N-8B-4/A, N-8F, N-8F/A, N-14, N-14/A, N-14MEF, N-CEN, N-CEN/A, N-CSR, N-CSR/A, N-MFP, N-MFP/A, N-PX, N-PX/A, N-Q, N-Q/A, NT 10-D, NT 10-D/A, NT 10-K, NT 10-K/A, NT 10-Q, NT 10-Q/A, NT 11-K, NT 11-K/A, NT 15D2, NT 15D2/A, NT 20-F, NT 20-F/A, NT-NCSR, NT-NCSR/A, POS AM, POS AM/A, POS EX, POS EX/A, POS462B, POS462B/A, POS462C, POS462C/A, PRE 14A, PRE 14A/A, PRE 14C, PRE 14C/A, PREM14A, PREM14A/A, PREM14C, PREM14C/A, S-1, S-1/A, S-1MEF, S-2, S-2/A, S-2MEF, S-3, S-3/A, S-3ASR, S-3D, S-3D/A, S-3DPOS, S-3DPOS/A, S-4, S-4/A, S-4MEF, S-6, S-6/A, S-8, S-8/A, S-8 POS, S-11, S-11/A, S-11MEF, S-20, S-20/A, SBSE, SBSE/A, SBSE-A, SBSE-A/A, SBSE-BD, SBSE-BD/A, SBSE-C, SBSE-C/A, SC 13D, SC 13D/A, SC 13E1, SC 13E1/A, SC 13E3, SC 13E3/A, SC 13G, SC 13G/A, SC 14D1, SC 14D1/A, SC 14D9, SC 14D9/A, SC 14F1, SC 14F1/A, SC TO-C, SC TO-C/A, SC TO-I, SC TO-I/A, SC TO-T, SC TO-T/A, SD, SD/A, SF-1, SF-1/A, SF-1MEF, SF-3, SF-3/A, SP 15D2, SP 15D2/A, T-3, T-3/A, TA-1, TA-1/A, TA-2, TA-2/A, TA-W, UNDER, UNDER/A, X-17A-5, X-17A-5/A
-
-## Query Patterns
-
-### CIK Searches
+**Schema** (Partial):
 ```sql
--- Direct CIK lookup (no leading zeros)
-SELECT * FROM filings WHERE cik = '1000045';
-
--- Partial CIK match
-SELECT * FROM filings WHERE cik LIKE '100004%';
+CREATE TABLE submissions (
+    adsh TEXT(20) NOT NULL PRIMARY KEY,
+    cik INTEGER NOT NULL,
+    name TEXT(150) NOT NULL,
+    sic INTEGER,
+    form TEXT(10),
+    period TEXT(8),
+    filed TEXT(8),
+    accepted TEXT(19),
+    fy INTEGER,
+    fp TEXT(2),
+    countryba TEXT,
+    stprba TEXT,
+    cityba TEXT,
+    zipba TEXT,
+    bas1 TEXT,
+    bas2 TEXT,
+    countryinc TEXT,
+    ein TEXT,
+    afs TEXT,
+    wksi INTEGER
+)
 ```
 
-### Company Name Searches
+**Key Details**:
+- `adsh`: Accession number (e.g., `0000012345-25-000001`)
+- `cik`: Company identifier (INTEGER, e.g., `1000045`)
+- `name`: Company name (e.g., `Apple Inc.`)
+- `sic`: Standard Industrial Classification code (e.g., `3571` for Electronic Computers)
+- `form`: Submission type (e.g., `10-K`, `13F-HR`)
+- `period`: Balance sheet date (YYYYMMDD, e.g., `20241231`)
+- `filed`: Filing date (YYYYMMDD, e.g., `20250214`)
+- `fy`: Fiscal year (e.g., `2024`)
+- `fp`: Fiscal period (e.g., `FY`, `Q1`)
+- `countryba`, `stprba`, `cityba`, `zipba`, `bas1`, `bas2`: Business address fields
+- `afs`: Filer status (e.g., `LAF`, `ACC`, `SRA`, `NON`, `SML`)
+- `wksi`: Well Known Seasoned Issuer (0 or 1)
+- **Notes**: `sic` codes starting with `60` indicate financial firms (e.g., `6021` for National Commercial Banks); tech sector typically includes `3570-3579`, `3600-3699`, `7370-7379`.
+
+### 3. `presentation_of_statement` Table
+Stores financial statement presentation data from `pre.txt`.
+
+**Schema** (Partial):
 ```sql
--- Case-insensitive company search
-SELECT * FROM filings WHERE UPPER(company_name) LIKE '%APPLE%';
+CREATE TABLE presentation_of_statement (
+    adsh TEXT(20) NOT NULL,
+    report INTEGER NOT NULL,
+    line INTEGER NOT NULL,
+    stmt TEXT(2) NOT NULL,
+    tag TEXT(256),
+    plabel TEXT(512),
+    version TEXT(20),
+    PRIMARY KEY (adsh, report, line),
+    FOREIGN KEY (adsh) REFERENCES submissions(adsh)
+)
 ```
 
-### Form Type Filtering
-```sql
--- Specific form type
-SELECT * FROM filings WHERE form_type = '10-K';
+**Key Details**:
+- `adsh`: Accession number (links to `submissions`)
+- `report`: Report grouping (e.g., `1`)
+- `line`: Presentation order (e.g., `100`)
+- `stmt`: Statement type (e.g., `BS` for Balance Sheet, `IS` for Income Statement)
+- `tag`: Line item tag (e.g., `Assets`)
+- `plabel`: Preferred label (e.g., `Total Assets`)
 
--- Multiple form types
-SELECT * FROM filings WHERE form_type IN ('10-K', '10-Q');
-```
+## Table Relationships
+- **Join `master_index` and `submissions`**:
+  - Use `CAST(submissions.cik AS TEXT) = master_index.cik` due to different data types.
+- **Join `submissions` and `presentation_of_statement`**:
+  - Use `presentation_of_statement.adsh = submissions.adsh`.
 
-### Date Filtering
-```sql
--- Recent filings
-SELECT * FROM filings WHERE date_filed >= '2025-03-01';
+## Guidelines for Query Generation
 
--- Date range
-SELECT * FROM filings WHERE date_filed BETWEEN '2025-01-01' AND '2025-03-31';
-```
+### 1. General Principles
+- Generate only `SELECT` queries to comply with security constraints.
+- Use table aliases (`m` for `master_index`, `s` for `submissions`, `p` for `presentation_of_statement`) for readability.
+- Optimize queries for a large dataset (~338K records in `master_index`).
+- Handle user inputs dynamically based on natural language requests.
+- For export requests (e.g., JSON), structure query results to include relevant metadata fields.
 
-## Important Notes for Natural Language Processing
+### 2. Handling Input Data
+- **CIK**:
+  - Remove leading zeros from `master.idx` CIK values (e.g., `0001000045` → `1000045`).
+  - Convert `submissions.cik` to TEXT when joining with `master_index`.
+- **Company Name**:
+  - Use `UPPER()` for case-insensitive searches in `master_index.company_name`.
+  - Support partial matches with `LIKE '%TERM%'`.
+  - Use `submissions.name` for more accurate names when available.
+- **Form Type**:
+  - Validate against standard form types (e.g., `10-K`, `10-Q`, `8-K`, `13F-HR`).
+  - Use `IN` for multiple form types (e.g., `form_type IN ('10-K', '8-K')`).
+- **Date Fields**:
+  - Convert `submissions.filed` and `submissions.period` (YYYYMMDD) to YYYY-MM-DD for comparisons with `master_index.date_filed`.
+  - Use SQLite date functions (e.g., `date(substr(s.filed, 1, 4) || '-' || substr(s.filed, 5, 2) || '-' || substr(s.filed, 7, 2))`) for formatting.
+- **SIC Codes**:
+  - Filter by specific codes or ranges (e.g., `sic BETWEEN 3570 AND 3579` for tech, `sic LIKE '60%'` for financial firms).
+  - Healthcare sector typically includes `sic` codes `8000-8099`.
+- **Registration Status**:
+  - Infer Section 12 or 15 registration from `submissions.afs` (filer status) and `submissions.wksi`.
+  - Assume `afs` values like `LAF` (Large Accelerated Filer), `ACC` (Accelerated Filer), or `SRA` (Smaller Reporting Accelerated) indicate Section 12 registration.
+  - Section 15 registration may apply to broker-dealers (form types like `SBSE`, `SBSE-A`).
+- **13F Threshold**:
+  - Identify 13F filers via `form_type = '13F-HR'` or `form_type = '13F-NT'`.
+  - Threshold crossing requires comparing filing dates to the previous quarter.
 
-### CIK Handling
-- **Database Storage**: CIKs stored WITHOUT leading zeros
-- **User Input**: May include leading zeros (e.g., `0001000045`)
-- **Normalization Required**: Remove leading zeros before querying
-- **Example**: `0001000045` → `1000045`
+### 3. Query Patterns
+The LLM should generate queries tailored to the following categories, using data from `master.idx`, `sub.txt`, and `pre.txt`:
 
-### Company Name Matching
-- **Case Sensitivity**: Always use `UPPER()` function for case-insensitive searches
-- **Partial Matching**: Use `LIKE '%TERM%'` for substring matches
-- **Example**: `UPPER(company_name) LIKE '%MICROSOFT%'`
+#### a. Registration Status & 13F Threshold
+**Examples**:
+1. **Is XYZ Corporation registered under Section 12 or 15?**
+   ```sql
+   SELECT s.name, s.cik, s.afs, s.wksi, m.form_type
+   FROM submissions s
+   LEFT JOIN master_index m ON CAST(s.cik AS TEXT) = m.cik
+   WHERE UPPER(s.name) LIKE '%XYZ CORPORATION%'
+     AND (s.afs IN ('LAF', 'ACC', 'SRA') OR m.form_type LIKE 'SBSE%')
+   LIMIT 1;
+   ```
+   - **Logic**: Check `afs` for Section 12 (e.g., `LAF`, `ACC`) and `form_type` for Section 15 (e.g., `SBSE`). Use latest submission.
 
-### Security Constraints
-The application restricts SQL operations to SELECT statements only. The following operations are forbidden:
-- `DROP`, `DELETE`, `INSERT`, `UPDATE`
-- `CREATE`, `ALTER`, `TRUNCATE`
+2. **List all companies registered under Section 15 as of June 2025**
+   ```sql
+   SELECT DISTINCT s.name, s.cik, m.form_type, m.date_filed
+   FROM master_index m
+   JOIN submissions s ON CAST(s.cik AS TEXT) = m.cik
+   WHERE m.form_type LIKE 'SBSE%'
+     AND m.date_filed <= '2025-06-30'
+   ORDER BY s.name;
+   ```
+   - **Logic**: Filter for `SBSE` form types indicating broker-dealer (Section 15) registration.
 
-## Performance Considerations
-- **No Indexes**: Currently no indexes defined (consider adding for better performance)
-- **Large Dataset**: ~338K records require efficient queries
-- **Recommended Indexes**:
+3. **Which companies in the tech sector crossed the 13F threshold last quarter?**
+   ```sql
+   SELECT DISTINCT s.name, s.cik, m.form_type, m.date_filed
+   FROM master_index m
+   JOIN submissions s ON CAST(s.cik AS TEXT) = m.cik
+   WHERE m.form_type IN ('13F-HR', '13F-NT')
+     AND m.date_filed BETWEEN '2025-01-01' AND '2025-03-31'
+     AND s.sic BETWEEN 3570 AND 3579
+   ORDER BY m.date_filed;
+   ```
+   - **Logic**: Identify new 13F filers in Q1 2025 (Jan-Mar) with tech SIC codes.
+
+**LLM Guidance**:
+- Use `afs` and `wksi` for Section 12; check `form_type` for Section 15.
+- For 13F, filter by `13F-HR` or `13F-NT` and compare filing dates across quarters.
+- Restrict to relevant date ranges (e.g., `date_filed` or `filed`).
+
+#### b. Company Metadata Lookup
+**Examples**:
+1. **What is the SIC code and business address for ABC Holding?**
+   ```sql
+   SELECT s.name, s.cik, s.sic, s.countryba, s.stprba, s.cityba, s.zipba, s.bas1, s.bas2
+   FROM submissions s
+   WHERE UPPER(s.name) LIKE '%ABC HOLDING%'
+   LIMIT 1;
+   ```
+   - **Logic**: Retrieve latest submission record for address and SIC.
+
+2. **Show the executive team listed in the latest 10-K filing for ABC Inc.**
+   ```sql
+   SELECT s.name, s.cik, m.form_type, m.date_filed, m.filename
+   FROM master_index m
+   JOIN submissions s ON CAST(s.cik AS TEXT) = m.cik
+   WHERE UPPER(s.name) LIKE '%ABC INC%'
+     AND m.form_type = '10-K'
+   ORDER BY m.date_filed DESC
+   LIMIT 1;
+   ```
+   - **Logic**: Identify latest 10-K; note that executive team data may require parsing `filename` content (not directly in database).
+
+3. **Retrieve the CIK and registration status for all companies filed in the last 7 days**
+   ```sql
+   SELECT DISTINCT s.name, s.cik, s.afs, s.wksi
+   FROM submissions s
+   WHERE date(substr(s.filed, 1, 4) || '-' || substr(s.filed, 5, 2) || '-' || substr(s.filed, 7, 2)) >= date('2025-06-28', '-7 days')
+   ORDER BY s.name;
+   ```
+   - **Logic**: Filter by `filed` date within 7 days; use `afs` for registration status.
+
+**LLM Guidance**:
+- Use `submissions` for metadata like `sic`, `countryba`, `stprba`.
+- For executive data, return `filename` or suggest external parsing of 10-K filings.
+- Convert `filed` (YYYYMMDD) to YYYY-MM-DD for date filtering.
+
+#### c. Filing History & Trends
+**Examples**:
+1. **How many 10-K filings submitted by financial firms in Q1 2025?**
+   ```sql
+   SELECT COUNT(*) AS filing_count
+   FROM master_index m
+   JOIN submissions s ON CAST(s.cik AS TEXT) = m.cik
+   WHERE m.form_type = '10-K'
+     AND m.date_filed BETWEEN '2025-01-01' AND '2025-03-31'
+     AND s.sic LIKE '60%';
+   ```
+   - **Logic**: Count 10-K filings for financial firms (SIC `60xx`).
+
+2. **List all companies that changed their registration status in the past year**
+   ```sql
+   SELECT s.name, s.cik, s.afs, s.filed
+   FROM submissions s
+   WHERE s.filed >= '20240628'
+     AND s.afs IS NOT NULL
+   ORDER BY s.name, s.filed;
+   ```
+   - **Logic**: Compare `afs` across submissions; requires manual analysis of changes (not directly trackable).
+
+3. **Which companies filed both 10-K and 8-K in the last 30 days?**
+   ```sql
+   SELECT s.name, s.cik
+   FROM submissions s
+   JOIN master_index m ON CAST(s.cik AS TEXT) = m.cik
+   WHERE m.form_type IN ('10-K', '8-K')
+     AND m.date_filed >= date('2025-06-28', '-30 days')
+   GROUP BY s.cik, s.name
+   HAVING COUNT(DISTINCT m.form_type) = 2;
+   ```
+   - **Logic**: Use `GROUP BY` and `HAVING` to ensure both form types exist.
+
+**LLM Guidance**:
+- Use `COUNT`, `GROUP BY`, and date ranges for trends.
+- For status changes, suggest comparing `afs` across time (may require external logic).
+- Validate form types and SIC ranges.
+
+#### d. Audit & Compliance Checks
+**Examples**:
+1. **Highlight discrepancies between Bloomberg 13F and EDGAR-derived registration status**
+   ```sql
+   SELECT s.name, s.cik, s.afs, m.form_type, m.date_filed
+   FROM submissions s
+   LEFT JOIN master_index m ON CAST(s.cik AS TEXT) = m.cik
+   WHERE m.form_type IN ('13F-HR', '13F-NT')
+     AND s.afs NOT IN ('LAF', 'ACC', 'SRA')
+     AND m.date_filed <= '2025-06-30';
+   ```
+   - **Logic**: Identify 13F filers without expected registration status.
+
+2. **Generate report of all companies missing registration status**
+   ```sql
+   SELECT s.name, s.cik
+   FROM submissions s
+   WHERE s.afs IS NULL
+   ORDER BY s.name;
+   ```
+   - **Logic**: Filter for `NULL` `afs` values.
+
+3. **Which companies have not filed a 10-K in the past 12 months?**
+   ```sql
+   SELECT DISTINCT s.name, s.cik
+   FROM submissions s
+   LEFT JOIN master_index m ON CAST(s.cik AS TEXT) = m.cik
+   WHERE m.form_type = '10-K'
+     AND (m.date_filed < '2024-06-28' OR m.date_filed IS NULL)
+   ORDER BY s.name;
+   ```
+   - **Logic**: Identify companies without recent 10-K filings.
+
+**LLM Guidance**:
+- For discrepancies, compare `form_type` (e.g., 13F) with `afs`.
+- Handle `NULL` values explicitly for missing data.
+- Use `LEFT JOIN` to find non-filers.
+
+#### e. Advanced Filtering & Export
+**Examples**:
+1. **Export all Section 12 registered companies in the healthcare sector**
+   ```sql
+   SELECT s.name, s.cik, s.afs, s.sic, s.countryba, s.stprba, s.cityba
+   FROM submissions s
+   WHERE s.afs IN ('LAF', 'ACC', 'SRA')
+     AND s.sic BETWEEN 8000 AND 8099
+   ORDER BY s.name;
+   ```
+   - **Logic**: Filter by `afs` and healthcare SIC codes; structure for JSON export.
+
+2. **Show all filings with executive changes and export metadata to JSON**
+   ```sql
+   SELECT s.name, s.cik, m.form_type, m.date_filed, m.filename
+   FROM master_index m
+   JOIN submissions s ON CAST(s.cik AS TEXT) = m.cik
+   WHERE m.form_type = '8-K'
+     AND m.date_filed <= '2025-06-30'
+   ORDER BY m.date_filed DESC;
+   ```
+   - **Logic**: Assume 8-K filings may indicate executive changes; include metadata for export.
+
+3. **List all companies with SIC code starting with 60 and registered under Section 12**
+   ```sql
+   SELECT s.name, s.cik, s.afs, s.sic
+   FROM submissions s
+   WHERE s.afs IN ('LAF', 'ACC', 'SRA')
+     AND s.sic LIKE '60%'
+   ORDER BY s.name;
+   ```
+   - **Logic**: Filter by financial SIC codes and Section 12 status.
+
+**LLM Guidance**:
+- For exports, include key metadata fields (e.g., `name`, `cik`, `form_type`, `date_filed`).
+- Use `DISTINCT` to avoid duplicates in results.
+- Structure results for JSON by selecting clear, relevant columns.
+
+### 4. Error Handling
+- **Invalid CIK**: Strip leading zeros; validate format.
+- **Unknown Form Type**: Suggest valid form types (e.g., `10-K`, `13F-HR`).
+- **Date Mismatch**: Normalize YYYYMMDD to YYYY-MM-DD; handle invalid dates.
+- **No Results**: Return “No matching records found” with context (e.g., “No 10-K filings for ABC Inc. in 2025”).
+- **Missing Data**: Use `COALESCE` or check for `NULL` in critical fields like `afs`.
+
+### 5. Performance Optimization
+- Filter on specific columns (e.g., `cik`, `form_type`, `date_filed`) to reduce scans.
+- Use `LIMIT` (e.g., `LIMIT 100`) for large result sets.
+- Suggest indexes for performance:
   ```sql
-  CREATE INDEX idx_cik ON filings(cik);
-  CREATE INDEX idx_form_type ON filings(form_type);
-  CREATE INDEX idx_date_filed ON filings(date_filed);
-  CREATE INDEX idx_company_name ON filings(company_name);
+  CREATE INDEX idx_master_cik ON master_index(cik);
+  CREATE INDEX idx_master_form_type ON master_index(form_type);
+  CREATE INDEX idx_submissions_cik ON submissions(cik);
+  CREATE INDEX idx_submissions_adsh ON submissions(adsh);
+  CREATE INDEX idx_presentation_adsh ON presentation_of_statement(adsh);
   ```
 
-## Usage Context
-This schema is used by a Streamlit application that:
-1. Downloads SEC master index files
-2. Loads filing data into SQLite
-3. Accepts natural language queries
-4. Converts queries to SQL using LLM
-5. Returns formatted results
+## Example LLM Workflow
+**User Input**: “List all tech companies that filed a 13F-HR in Q1 2025.”
+**Steps**:
+1. Identify entities:
+   - Sector: Tech (`sic BETWEEN 3570 AND 3579`)
+   - Form: `13F-HR`
+   - Timeframe: Q1 2025 (`date_filed BETWEEN '2025-01-01' AND '2025-03-31'`)
+2. Construct query:
+   ```sql
+   SELECT DISTINCT s.name, s.cik, m.form_type, m.date_filed
+   FROM master_index m
+   JOIN submissions s ON CAST(s.cik AS TEXT) = m.cik
+   WHERE m.form_type = '13F-HR'
+     AND m.date_filed BETWEEN '2025-01-01' AND '2025-03-31'
+     AND s.sic BETWEEN 3570 AND 3579
+   ORDER BY s.name
+   LIMIT 100;
+   ```
+3. Validate:
+   - Confirm `13F-HR` is valid.
+   - Ensure date range and SIC codes are correct.
+   - Handle potential `NULL` SIC values.
 
-The database serves as the foundation for SEC filing research and analysis tools.
+## Notes for LLM
+- **Context Awareness**: Use conversation history to refine queries (e.g., reuse CIK from prior input).
+- **Flexibility**: Support variations (e.g., “Apple Inc.”, “Apple”, CIK `320193`).
+- **Export Handling**: For JSON exports, suggest fields like `name`, `cik`, `form_type`, `date_filed`.
+- **Limitations**:
+  - Executive team data requires parsing filing documents (not in database).
+  - Registration status changes need external comparison logic.
+  - Bloomberg 13F data is external; compare only with EDGAR `form_type` and `afs`.
+- **Memory Management**: If users request to forget chats, instruct them to:
+  - Click the book icon under the message and select the chat to forget.
+  - Disable memory in the “Data Controls” section of settings.
+
+## Security Reminder
+- Restrict to `SELECT` queries only.
+- Sanitize inputs to prevent SQL injection (e.g., escape special characters).

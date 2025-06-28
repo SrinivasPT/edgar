@@ -10,7 +10,7 @@ from pathlib import Path
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
-from edgar.web import main
+from edgar.web import main  # noqa: E402
 
 if __name__ == "__main__":
     main()
